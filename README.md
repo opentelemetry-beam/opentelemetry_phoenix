@@ -6,7 +6,7 @@ After installing, setup the handler in your application behaviour before your
 top-level supervisor starts.
 
 ```elixir
-OpentelemetryEcto.setup()
+OpentelemetryPhoenix.setup()
 ```
 
 See the documentation for `OpentelemetryPhoenix.setup/1` for additional options that
