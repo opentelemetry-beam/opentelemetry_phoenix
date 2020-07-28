@@ -73,7 +73,7 @@ defmodule OpentelemetryPhoenix do
   @doc false
   def attach_router_dispatch_exception_handler do
     :telemetry.attach(
-      {__MODULE__, :exception},
+      {__MODULE__, :router_dispatch_exception},
       [:phoenix, :router_dispatch, :exception],
       &__MODULE__.handle_router_dispatch_exception/4,
       %{}
@@ -83,7 +83,7 @@ defmodule OpentelemetryPhoenix do
   @doc false
   def attach_exception_handler do
     :telemetry.attach(
-      {__MODULE__, :exception},
+      {__MODULE__, :endpoint_exception},
       [:phoenix, :error_rendered],
       &__MODULE__.handle_exception/4,
       %{}
@@ -105,17 +105,17 @@ defmodule OpentelemetryPhoenix do
     peer_ip = Map.get(peer_data, :address)
 
     attributes = [
-      {"http.target", conn.request_path},
-      {"http.host", conn.host},
-      {"http.scheme", "#{conn.scheme}"},
-      {"http.user_agent", user_agent},
-      {"http.method", conn.method},
       {"http.client_ip", client_ip(conn)},
+      {"http.host", conn.host},
+      {"http.method", conn.method},
+      {"http.scheme", "#{conn.scheme}"},
+      {"http.target", conn.request_path},
+      {"http.user_agent", user_agent},
+      {"net.host.ip", to_string(:inet_parse.ntoa(conn.remote_ip))},
+      {"net.host.port", conn.port},
       {"net.peer.ip", to_string(:inet_parse.ntoa(peer_ip))},
       {"net.peer.port", peer_data.port},
-      {"net.transport", "IP.TCP"},
-      {"net.host.ip", to_string(:inet_parse.ntoa(conn.remote_ip))},
-      {"net.host.port", conn.port}
+      {"net.transport", "IP.TCP"}
     ]
 
     OpenTelemetry.Span.set_attributes(attributes)
@@ -132,15 +132,22 @@ defmodule OpentelemetryPhoenix do
   def handle_router_dispatch_start(_event, _measurements, meta, _config) do
     if in_span?() do
       OpenTelemetry.Span.update_name(meta.route)
+
+      attributes = [
+        {"phoenix.plug", to_string(meta.plug)},
+        {"phoenix.action", to_string(meta.plug_opts)}
+      ]
+
+      OpenTelemetry.Span.set_attributes(attributes)
     end
   end
 
   def handle_exception(_event, _measurements, meta, _config) do
     if in_span?() do
       exception_attrs = [
-        {"type", meta.kind},
-        {"message", meta.reason},
-        {"stacktrace", meta.stacktrace}
+        {"type", to_string(meta.kind)},
+        {"message", meta.reason.message},
+        {"stacktrace", "#{inspect(meta.stacktrace)}"}
       ]
 
       # TODO: events don't seem to be supported in Jaeger or Zipkin.
@@ -154,9 +161,9 @@ defmodule OpentelemetryPhoenix do
   def handle_router_dispatch_exception(_event, _measurements, meta, _config) do
     if in_span?() do
       exception_attrs = [
-        {"type", meta.kind},
-        {"message", meta.reason},
-        {"stacktrace", meta.stacktrace}
+        {"type", to_string(meta.kind)},
+        {"message", meta.reason.message},
+        {"stacktrace", "#{inspect(meta.stacktrace)}"}
       ]
 
       # TODO: events don't seem to be supported in Jaeger or Zipkin.

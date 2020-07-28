@@ -1,0 +1,24 @@
+name: Test
+
+on:
+  pull_request:
+    branches:
+      - 'master'
+  push:
+    branches:
+      - 'master'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v1.0.0
+    - uses: actions/setup-elixir@v1.0.0
+      with:
+        otp-version: 22.x
+        elixir-version: 1.9.x
+    - name: Fetch deps
+      run: mix deps.get
+    - name: Run tests
+      run: mix test
