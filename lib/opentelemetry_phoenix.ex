@@ -160,9 +160,9 @@ defmodule OpentelemetryPhoenix do
 
   def handle_router_dispatch_exception(_event, _measurements, meta, _config) do
     if in_span?() do
+      # TODO: reason is a %Plug.Conn.WrapperError{} so no message
       exception_attrs = [
         {"type", to_string(meta.kind)},
-        {"message", meta.reason.message},
         {"stacktrace", "#{inspect(meta.stacktrace)}"}
       ]
 
