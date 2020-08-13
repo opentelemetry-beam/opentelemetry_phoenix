@@ -141,7 +141,7 @@ defmodule OpentelemetryPhoenixTest do
 
     assert_receive {:span,
                     span(
-                      name: "/users/{user_id}/orders",
+                      name: "GET /users/{user_id}/orders",
                       attributes: list,
                       status: ^expected_status
                     )}
@@ -210,7 +210,7 @@ defmodule OpentelemetryPhoenixTest do
 
     assert_receive {:span,
                     span(
-                      name: "/users/{user_id}/orders",
+                      name: "GET /users/{user_id}/orders",
                       attributes: list,
                       kind: :SERVER,
                       events: [
@@ -290,7 +290,7 @@ defmodule OpentelemetryPhoenixTest do
 
     assert_receive {:span,
                     span(
-                      name: "/users/{user_id}/orders",
+                      name: "GET /users/{user_id}/orders",
                       attributes: list,
                       events: [
                         event(
