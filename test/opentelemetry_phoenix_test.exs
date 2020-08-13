@@ -219,7 +219,8 @@ defmodule OpentelemetryPhoenixTest do
                           attributes: [
                             {"type", "error"},
                             {"message", "Wrong argument type for x"},
-                            {"stacktrace", stacktrace}
+                            {"stacktrace", stacktrace},
+                            {"error", "true"}
                           ]
                         )
                       ],
@@ -296,7 +297,8 @@ defmodule OpentelemetryPhoenixTest do
                           name: "exception",
                           attributes: [
                             {"type", "error"},
-                            {"stacktrace", stacktrace}
+                            {"stacktrace", stacktrace},
+                            {"error", "true"}
                           ]
                         )
                       ],
