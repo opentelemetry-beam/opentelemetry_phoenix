@@ -131,7 +131,7 @@ defmodule OpentelemetryPhoenix do
 
   def handle_router_dispatch_start(_event, _measurements, meta, _config) do
     if in_span?() do
-      OpenTelemetry.Span.update_name(meta.route)
+      OpenTelemetry.Span.update_name("#{meta.conn.method} #{meta.route}")
 
       attributes = [
         {"phoenix.plug", to_string(meta.plug)},
