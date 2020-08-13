@@ -147,7 +147,8 @@ defmodule OpentelemetryPhoenix do
       exception_attrs = [
         {"type", to_string(meta.kind)},
         {"message", meta.reason.message},
-        {"stacktrace", "#{inspect(meta.stacktrace)}"}
+        {"stacktrace", "#{inspect(meta.stacktrace)}"},
+        {"error", "true"}
       ]
 
       # TODO: events don't seem to be supported in Jaeger or Zipkin.
@@ -163,7 +164,8 @@ defmodule OpentelemetryPhoenix do
       # TODO: reason is a %Plug.Conn.WrapperError{} so no message
       exception_attrs = [
         {"type", to_string(meta.kind)},
-        {"stacktrace", "#{inspect(meta.stacktrace)}"}
+        {"stacktrace", "#{inspect(meta.stacktrace)}"},
+        {"error", "true"}
       ]
 
       # TODO: events don't seem to be supported in Jaeger or Zipkin.
