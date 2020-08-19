@@ -93,11 +93,11 @@ defmodule OpentelemetryPhoenix do
   @doc false
   def handle_endpoint_start(_event, _measurements, %{conn: conn}, _config) do
     # TODO: maybe add config for what paths are traced
-    :ot_propagation.http_extract(conn.req_headers)
+    ctx = :ot_propagation.http_extract(conn.req_headers)
 
     span_name = "HTTP #{conn.method}"
 
-    OpenTelemetry.Tracer.start_span(span_name, %{kind: :SERVER})
+    OpenTelemetry.Tracer.start_span(span_name, %{kind: :SERVER, parent: ctx})
 
     peer_data = Plug.Conn.get_peer_data(conn)
 
@@ -122,58 +122,50 @@ defmodule OpentelemetryPhoenix do
   end
 
   def handle_endpoint_stop(_event, _measurements, %{conn: conn}, _config) do
-    if in_span?() do
-      OpenTelemetry.Span.set_attribute("http.status", conn.status)
-      span_status(conn.status) |> OpenTelemetry.Span.set_status()
-      OpenTelemetry.Tracer.end_span()
-    end
+    OpenTelemetry.Span.set_attribute("http.status", conn.status)
+    span_status(conn.status) |> OpenTelemetry.Span.set_status()
+    OpenTelemetry.Tracer.end_span()
   end
 
   def handle_router_dispatch_start(_event, _measurements, meta, _config) do
-    if in_span?() do
-      OpenTelemetry.Span.update_name("#{meta.conn.method} #{meta.route}")
+    OpenTelemetry.Span.update_name("#{meta.conn.method} #{meta.route}")
 
-      attributes = [
-        {"phoenix.plug", to_string(meta.plug)},
-        {"phoenix.action", to_string(meta.plug_opts)}
-      ]
+    attributes = [
+      {"phoenix.plug", to_string(meta.plug)},
+      {"phoenix.action", to_string(meta.plug_opts)}
+    ]
 
-      OpenTelemetry.Span.set_attributes(attributes)
-    end
+    OpenTelemetry.Span.set_attributes(attributes)
   end
 
   def handle_exception(_event, _measurements, meta, _config) do
-    if in_span?() do
-      exception_attrs = [
-        {"type", to_string(meta.kind)},
-        {"message", meta.reason.message},
-        {"stacktrace", "#{inspect(meta.stacktrace)}"},
-        {"error", "true"}
-      ]
+    exception_attrs = [
+      {"type", to_string(meta.kind)},
+      {"message", meta.reason.message},
+      {"stacktrace", "#{inspect(meta.stacktrace)}"},
+      {"error", "true"}
+    ]
 
-      # TODO: events don't seem to be supported in Jaeger or Zipkin.
-      OpenTelemetry.Span.add_event("exception", exception_attrs)
-      OpenTelemetry.Span.set_attributes([{"http.status", meta.status}])
-      span_status(meta.status) |> OpenTelemetry.Span.set_status()
-      OpenTelemetry.Tracer.end_span()
-    end
+    # TODO: events don't seem to be supported in Jaeger or Zipkin but do in Lightstep
+    OpenTelemetry.Span.add_event("exception", exception_attrs)
+    OpenTelemetry.Span.set_attributes([{"http.status", meta.status}])
+    span_status(meta.status) |> OpenTelemetry.Span.set_status()
+    OpenTelemetry.Tracer.end_span()
   end
 
   def handle_router_dispatch_exception(_event, _measurements, meta, _config) do
-    if in_span?() do
-      # TODO: reason is a %Plug.Conn.WrapperError{} so no message
-      exception_attrs = [
-        {"type", to_string(meta.kind)},
-        {"stacktrace", "#{inspect(meta.stacktrace)}"},
-        {"error", "true"}
-      ]
+    # TODO: reason is a %Plug.Conn.WrapperError{} so no message
+    exception_attrs = [
+      {"type", to_string(meta.kind)},
+      {"stacktrace", "#{inspect(meta.stacktrace)}"},
+      {"error", "true"}
+    ]
 
-      # TODO: events don't seem to be supported in Jaeger or Zipkin.
-      OpenTelemetry.Span.add_event("exception", exception_attrs)
-      OpenTelemetry.Span.set_attributes([{"http.status", 500}])
-      span_status(500) |> OpenTelemetry.Span.set_status()
-      OpenTelemetry.Tracer.end_span()
-    end
+    # TODO: events don't seem to be supported in Jaeger or Zipkin but do in Lightstep
+    OpenTelemetry.Span.add_event("exception", exception_attrs)
+    OpenTelemetry.Span.set_attributes([{"http.status", 500}])
+    span_status(500) |> OpenTelemetry.Span.set_status()
+    OpenTelemetry.Tracer.end_span()
   end
 
   # 300s as Ok for now until redirect condition handled
@@ -244,6 +236,4 @@ defmodule OpentelemetryPhoenix do
         value
     end
   end
-
-  defp in_span?, do: OpenTelemetry.Tracer.current_ctx() != :undefined
 end
