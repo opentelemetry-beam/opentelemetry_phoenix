@@ -139,12 +139,9 @@ defmodule OpentelemetryPhoenix do
   end
 
   def handle_exception(_event, _measurements, meta, _config) do
-    exception_attrs = [
-      {"type", to_string(meta.kind)},
-      {"message", meta.reason.message},
-      {"stacktrace", "#{inspect(meta.stacktrace)}"},
-      {"error", "true"}
-    ]
+    exception_attrs = Enum.map(meta, fn {k, v} ->
+      {k, "#{inspect(v)}"}
+    end)
 
     # TODO: events don't seem to be supported in Jaeger or Zipkin but do in Lightstep
     OpenTelemetry.Span.add_event("exception", exception_attrs)
