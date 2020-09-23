@@ -1,9 +1,8 @@
 # OpentelemetryPhoenix
-=====
 
 [![EEF Observability WG project](https://img.shields.io/badge/EEF-Observability-black)](https://github.com/erlef/eef-observability-wg)
 [![Hex.pm](https://img.shields.io/hexpm/v/opentelemetry_phoenix)](https://hex.pm/packages/opentelemetry_phoenix)
-![Build Status](https://github.com/opentelemetry_beam/opentelemetry_phoenix/workflows/test/badge.svg)
+![Build Status](https://github.com/opentelemetry-beam/opentelemetry_phoenix/workflows/Build/badge.svg)
 
 Telemetry handler that creates Opentelemetry spans from Phoenix events.
 
