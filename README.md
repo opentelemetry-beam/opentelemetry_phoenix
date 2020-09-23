@@ -1,4 +1,9 @@
 # OpentelemetryPhoenix
+=====
+
+[![EEF Observability WG project](https://img.shields.io/badge/EEF-Observability-black)](https://github.com/erlef/eef-observability-wg)
+[![Hex.pm](https://img.shields.io/hexpm/v/opentelemetry_phoenix)](https://hex.pm/packages/opentelemetry_phoenix)
+![Build Status](https://github.com/opentelemetry_beam/opentelemetry_phoenix/workflows/test/badge.svg)
 
 Telemetry handler that creates Opentelemetry spans from Phoenix events.
 
@@ -15,9 +20,6 @@ may be supplied.
 
 ## Installation
 
-If [available in Hex](https://hex.pm/docs/publish), the package can be installed
-by adding `opentelemetry_phoenix` to your list of dependencies in `mix.exs`:
-
 ```elixir
 def deps do
   [
@@ -25,8 +27,4 @@ def deps do
   ]
 end
 ```
-
-Documentation can be generated with [ExDoc](https://github.com/elixir-lang/ex_doc)
-and published on [HexDocs](https://hexdocs.pm). Once published, the docs can
-be found at [https://hexdocs.pm/opentelemetry_phoenix](https://hexdocs.pm/opentelemetry_phoenix).
 
