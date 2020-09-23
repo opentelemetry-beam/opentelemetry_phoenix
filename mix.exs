@@ -39,8 +39,13 @@ defmodule OpentelemetryPhoenix.MixProject do
   # Run "mix help deps" to learn about dependencies.
   defp deps do
     [
-      {:opentelemetry_api, "~> 0.3"},
-      {:opentelemetry, "~> 0.4"},
+      {:opentelemetry_api,
+       github: "open-telemetry/opentelemetry-erlang-api",
+       ref: "6dff2509273a023da9fb33f8ead21fbf7885d3e1",
+       override: true},
+      {:opentelemetry,
+       github: "open-telemetry/opentelemetry-erlang",
+       ref: "cdbda95ba6d2e58f50ed4a7428bffce62588ba64"},
       {:telemetry, "~> 0.4"},
       {:plug, "~> 1.10", optional: true},
       {:ex_doc, "~> 0.21.0", only: [:dev], runtime: false},
