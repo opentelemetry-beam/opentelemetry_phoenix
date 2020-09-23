@@ -97,7 +97,7 @@ defmodule OpentelemetryPhoenix do
   end
 
   @doc false
-  def handle_endpoint_start(_event, _measurements, %{conn: conn}, _config) do
+  def handle_endpoint_start(_event, _measurements, %{conn: %{adapter: adapter} = conn}, _config) do
     # TODO: maybe add config for what paths are traced? Via sampler?
     ctx = :ot_propagation.http_extract(conn.req_headers)
 
@@ -112,6 +112,7 @@ defmodule OpentelemetryPhoenix do
 
     attributes = [
       "http.client_ip": client_ip(conn),
+      "http.flavor": http_flavor(adapter),
       "http.host": conn.host,
       "http.method": conn.method,
       "http.scheme": "#{conn.scheme}",
@@ -160,6 +161,16 @@ defmodule OpentelemetryPhoenix do
     ]
 
     Span.add_event("exception", exception_attrs)
+  end
+
+  defp http_flavor({_adapter_name, meta}) do
+    case meta.version do
+      :"HTTP/1.0" -> :"1.0"
+      :"HTTP/1.1" -> :"1.1"
+      :"HTTP/2.0" -> :"2.0"
+      :SPDY -> :SPDY
+      :QUIC -> :QUIC
+    end
   end
 
   defp client_ip(%{remote_ip: remote_ip} = conn) do
