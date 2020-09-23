@@ -62,6 +62,7 @@ defmodule OpentelemetryPhoenixTest do
 
     assert [
              "http.client_ip": "10.211.55.2",
+             "http.flavor": :"1.1",
              "http.host": "localhost",
              "http.method": "GET",
              "http.scheme": "http",
@@ -128,6 +129,7 @@ defmodule OpentelemetryPhoenixTest do
 
     assert [
              "http.client_ip": "10.211.55.2",
+             "http.flavor": :"1.1",
              "http.host": "localhost",
              "http.method": "GET",
              "http.scheme": "http",
