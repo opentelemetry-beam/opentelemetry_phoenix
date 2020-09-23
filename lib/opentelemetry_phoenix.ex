@@ -11,6 +11,7 @@ defmodule OpentelemetryPhoenix do
 
   require OpenTelemetry.Tracer
   require OpenTelemetry.Span
+  alias OpenTelemetry.{Span, Tracer}
 
   @type opts :: [endpoint_prefix()]
 
@@ -27,7 +28,6 @@ defmodule OpentelemetryPhoenix do
     _ = OpenTelemetry.register_application_tracer(:opentelemetry_phoenix)
     attach_endpoint_start_handler(opts)
     attach_endpoint_stop_handler(opts)
-    attach_exception_handler()
     attach_router_start_handler()
     attach_router_dispatch_exception_handler()
 
@@ -81,23 +81,13 @@ defmodule OpentelemetryPhoenix do
   end
 
   @doc false
-  def attach_exception_handler do
-    :telemetry.attach(
-      {__MODULE__, :endpoint_exception},
-      [:phoenix, :error_rendered],
-      &__MODULE__.handle_exception/4,
-      %{}
-    )
-  end
-
-  @doc false
   def handle_endpoint_start(_event, _measurements, %{conn: conn}, _config) do
-    # TODO: maybe add config for what paths are traced
+    # TODO: maybe add config for what paths are traced? Via sampler?
     ctx = :ot_propagation.http_extract(conn.req_headers)
 
     span_name = "HTTP #{conn.method}"
 
-    OpenTelemetry.Tracer.start_span(span_name, %{kind: :SERVER, parent: ctx})
+    Tracer.start_span(span_name, %{kind: :SERVER, parent: ctx})
 
     peer_data = Plug.Conn.get_peer_data(conn)
 
@@ -105,64 +95,53 @@ defmodule OpentelemetryPhoenix do
     peer_ip = Map.get(peer_data, :address)
 
     attributes = [
-      {"http.client_ip", client_ip(conn)},
-      {"http.host", conn.host},
-      {"http.method", conn.method},
-      {"http.scheme", "#{conn.scheme}"},
-      {"http.target", conn.request_path},
-      {"http.user_agent", user_agent},
-      {"net.host.ip", to_string(:inet_parse.ntoa(conn.remote_ip))},
-      {"net.host.port", conn.port},
-      {"net.peer.ip", to_string(:inet_parse.ntoa(peer_ip))},
-      {"net.peer.port", peer_data.port},
-      {"net.transport", "IP.TCP"}
+      "http.client_ip": client_ip(conn),
+      "http.host": conn.host,
+      "http.method": conn.method,
+      "http.scheme": "#{conn.scheme}",
+      "http.target": conn.request_path,
+      "http.user_agent": user_agent,
+      "net.host.ip": to_string(:inet_parse.ntoa(conn.remote_ip)),
+      "net.host.port": conn.port,
+      "net.peer.ip": to_string(:inet_parse.ntoa(peer_ip)),
+      "net.peer.port": peer_data.port,
+      "net.transport": :"IP.TCP"
     ]
 
-    OpenTelemetry.Span.set_attributes(attributes)
+    Span.set_attributes(attributes)
   end
 
   def handle_endpoint_stop(_event, _measurements, %{conn: conn}, _config) do
-    OpenTelemetry.Span.set_attribute("http.status", conn.status)
-    span_status(conn.status) |> OpenTelemetry.Span.set_status()
-    OpenTelemetry.Tracer.end_span()
+    Span.set_attribute(:"http.status", conn.status)
+    span_status(conn.status) |> Span.set_status()
+    Tracer.end_span()
   end
 
   def handle_router_dispatch_start(_event, _measurements, meta, _config) do
-    OpenTelemetry.Span.update_name("#{meta.conn.method} #{meta.route}")
+    Span.update_name("#{meta.conn.method} #{meta.route}")
 
     attributes = [
-      {"phoenix.plug", to_string(meta.plug)},
-      {"phoenix.action", to_string(meta.plug_opts)}
+      "phoenix.plug": meta.plug,
+      "phoenix.action": meta.plug_opts
     ]
 
-    OpenTelemetry.Span.set_attributes(attributes)
+    Span.set_attributes(attributes)
   end
 
-  def handle_exception(_event, _measurements, meta, _config) do
-    exception_attrs = Enum.map(meta, fn {k, v} ->
-      {k, "#{inspect(v)}"}
-    end)
-
-    # TODO: events don't seem to be supported in Jaeger or Zipkin but do in Lightstep
-    OpenTelemetry.Span.add_event("exception", exception_attrs)
-    OpenTelemetry.Span.set_attributes([{"http.status", meta.status}])
-    span_status(meta.status) |> OpenTelemetry.Span.set_status()
-    OpenTelemetry.Tracer.end_span()
-  end
-
-  def handle_router_dispatch_exception(_event, _measurements, meta, _config) do
-    # TODO: reason is a %Plug.Conn.WrapperError{} so no message
+  def handle_router_dispatch_exception(
+        _event,
+        _measurements,
+        %{kind: kind, error: %{reason: reason}, stacktrace: stacktrace},
+        _config
+      ) do
     exception_attrs = [
-      {"type", to_string(meta.kind)},
-      {"stacktrace", "#{inspect(meta.stacktrace)}"},
-      {"error", "true"}
+      type: kind,
+      reason: reason,
+      stacktrace: Exception.format_stacktrace(stacktrace)
     ]
 
-    # TODO: events don't seem to be supported in Jaeger or Zipkin but do in Lightstep
-    OpenTelemetry.Span.add_event("exception", exception_attrs)
-    OpenTelemetry.Span.set_attributes([{"http.status", 500}])
-    span_status(500) |> OpenTelemetry.Span.set_status()
-    OpenTelemetry.Tracer.end_span()
+    Span.add_event("exception", exception_attrs)
+    OpenTelemetry.status(:InternalError, to_string(reason)) |> Span.set_status()
   end
 
   # 300s as Ok for now until redirect condition handled
