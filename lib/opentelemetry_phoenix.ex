@@ -113,7 +113,7 @@ defmodule OpentelemetryPhoenix do
 
   def handle_endpoint_stop(_event, _measurements, %{conn: conn}, _config) do
     Span.set_attribute(:"http.status", conn.status)
-    span_status(conn.status) |> Span.set_status()
+    :ot_http_status.to_status(conn.status) |> Span.set_status()
     Tracer.end_span()
   end
 
@@ -141,56 +141,6 @@ defmodule OpentelemetryPhoenix do
     ]
 
     Span.add_event("exception", exception_attrs)
-    OpenTelemetry.status(:InternalError, to_string(reason)) |> Span.set_status()
-  end
-
-  # 300s as Ok for now until redirect condition handled
-  # https://github.com/open-telemetry/opentelemetry-specification/blob/master/specification/trace/semantic_conventions/http.md#status
-  # move this to opentelemetry_erlang_api
-  defp span_status(code, msg \\ nil) do
-    case code do
-      code when code >= 100 and code < 300 ->
-        OpenTelemetry.status(:Ok, msg || "Ok")
-
-      code when code >= 300 and code < 400 ->
-        OpenTelemetry.status(:Ok, msg || "Ok")
-
-      401 ->
-        OpenTelemetry.status(:Unauthenticated, msg || "Unauthorized")
-
-      403 ->
-        OpenTelemetry.status(:PermissionDenied, msg || "Forbidden")
-
-      404 ->
-        OpenTelemetry.status(:NotFound, msg || "Not Found")
-
-      412 ->
-        OpenTelemetry.status(:FailedPrecondition, msg || "Failed Precondition")
-
-      416 ->
-        OpenTelemetry.status(:OutOfRange, msg || "Range Not Satisfiable")
-
-      429 ->
-        OpenTelemetry.status(:ResourceExhausted, msg || "Too Many Requests")
-
-      code when code >= 400 and code < 500 ->
-        OpenTelemetry.status(:InvalidArgument, msg || "Bad Argument")
-
-      501 ->
-        OpenTelemetry.status(:Unimplemented, msg || "Not Implemented")
-
-      503 ->
-        OpenTelemetry.status(:Unavailable, msg || "Service Unavailable")
-
-      504 ->
-        OpenTelemetry.status(:DeadlineExceeded, msg || "Gateway Timeout")
-
-      code when code >= 500 ->
-        OpenTelemetry.status(:InternalError, msg || "Internal Error")
-
-      _ ->
-        OpenTelemetry.status(:UnknownError, msg || "Unknown Status")
-    end
   end
 
   defp client_ip(%{remote_ip: remote_ip} = conn) do
