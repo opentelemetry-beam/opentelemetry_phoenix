@@ -1,18 +1,34 @@
 defmodule OpentelemetryPhoenix do
   @moduledoc """
-  OpentelemetryPhoenix uses Telemetry handlers to create OpenTelemetry spans.
+  OpentelemetryPhoenix uses [telemetry](https://hexdocs.pm/telemetry/) handlers to create `OpenTelemetry` spans.
+
+  Current events which are supported include endpoint start/stop, router start/stop,
+  and router exceptions.
 
   ## Usage
 
   In your application start:
 
-  `OpentelemetryPhoenix.setup()`
+      def start(_type, _args) do
+        OpenTelemetry.register_application_tracer(:my_app)
+        OpentelemetryPhoenix.setup()
+
+        children = [
+          {Phoenix.PubSub, name: MyApp.PubSub},
+          MyAppWeb.Endpoint
+        ]
+
+        opts = [strategy: :one_for_one, name: MyStore.Supervisor]
+        Supervisor.start_link(children, opts)
+      end
+
   """
 
   require OpenTelemetry.Tracer
   require OpenTelemetry.Span
   alias OpenTelemetry.{Span, Tracer}
 
+  @typedoc "Setup options"
   @type opts :: [endpoint_prefix()]
 
   @typedoc "The endpoint prefix in your endpoint. Defaults to `[:phoenix, :endpoint]`"
@@ -111,12 +127,14 @@ defmodule OpentelemetryPhoenix do
     Span.set_attributes(attributes)
   end
 
+  @doc false
   def handle_endpoint_stop(_event, _measurements, %{conn: conn}, _config) do
     Span.set_attribute(:"http.status", conn.status)
     :ot_http_status.to_status(conn.status) |> Span.set_status()
     Tracer.end_span()
   end
 
+  @doc false
   def handle_router_dispatch_start(_event, _measurements, meta, _config) do
     Span.update_name("#{meta.conn.method} #{meta.route}")
 
@@ -128,6 +146,7 @@ defmodule OpentelemetryPhoenix do
     Span.set_attributes(attributes)
   end
 
+  @doc false
   def handle_router_dispatch_exception(
         _event,
         _measurements,
