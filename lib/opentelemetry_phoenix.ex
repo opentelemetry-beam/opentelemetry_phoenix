@@ -164,12 +164,13 @@ defmodule OpentelemetryPhoenix do
   end
 
   defp http_flavor({_adapter_name, meta}) do
-    case meta.version do
+    case Map.get(meta, :version) do
       :"HTTP/1.0" -> :"1.0"
       :"HTTP/1.1" -> :"1.1"
       :"HTTP/2.0" -> :"2.0"
       :SPDY -> :SPDY
       :QUIC -> :QUIC
+      nil -> ""
     end
   end
 
