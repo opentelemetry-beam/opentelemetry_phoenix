@@ -1,6 +1,7 @@
 defmodule OpentelemetryPhoenix.Reason do
-  def normalize(%Plug.Conn.WrapperError{reason: reason}) do
-    normalize(reason)
+  def normalize(reason) when is_struct(reason) do
+    # %Plug.Conn.WrapperError{}
+    normalize(reason.reason)
   end
 
   def normalize(:badarg) do
