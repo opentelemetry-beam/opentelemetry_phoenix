@@ -68,8 +68,7 @@ defmodule OpentelemetryPhoenixTest do
              "http.scheme": "http",
              "http.status": 200,
              "http.target": "/users/123",
-             "http.user_agent":
-               "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:81.0) Gecko/20100101 Firefox/81.0",
+             "http.user_agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:81.0) Gecko/20100101 Firefox/81.0",
              "net.host.ip": "10.211.55.2",
              "net.host.port": 4000,
              "net.peer.ip": "10.211.55.2",
@@ -98,7 +97,7 @@ defmodule OpentelemetryPhoenixTest do
     :telemetry.execute(
       [:phoenix, :router_dispatch, :exception],
       %{duration: 222},
-      Meta.router_dispatch_exception()
+      Meta.router_dispatch_exception(:normal)
     )
 
     :telemetry.execute(
@@ -119,8 +118,10 @@ defmodule OpentelemetryPhoenixTest do
                           name: "exception",
                           attributes: [
                             type: :error,
-                            reason: :badarith,
-                            stacktrace: stacktrace
+                            stacktrace: stacktrace,
+                            reason: :badkey,
+                            key: :name,
+                            map: %{username: "rick"}
                           ]
                         )
                       ],
@@ -135,8 +136,73 @@ defmodule OpentelemetryPhoenixTest do
              "http.scheme": "http",
              "http.status": 500,
              "http.target": "/users/123/exception",
-             "http.user_agent":
-               "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:81.0) Gecko/20100101 Firefox/81.0",
+             "http.user_agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:81.0) Gecko/20100101 Firefox/81.0",
+             "net.host.ip": "10.211.55.2",
+             "net.host.port": 4000,
+             "net.peer.ip": "10.211.55.2",
+             "net.peer.port": 64291,
+             "net.transport": :"IP.TCP",
+             "phoenix.action": :code_exception,
+             "phoenix.plug": MyStoreWeb.PageController
+           ] == List.keysort(list, 0)
+  end
+
+  test "records exceptions for Phoenix web requests with plug wrappers" do
+    OpentelemetryPhoenix.setup()
+
+    :telemetry.execute(
+      [:phoenix, :endpoint, :start],
+      %{system_time: System.system_time()},
+      Meta.endpoint_start(:exception)
+    )
+
+    :telemetry.execute(
+      [:phoenix, :router_dispatch, :start],
+      %{system_time: System.system_time()},
+      Meta.router_dispatch_start(:exception)
+    )
+
+    :telemetry.execute(
+      [:phoenix, :router_dispatch, :exception],
+      %{duration: 222},
+      Meta.router_dispatch_exception(:plug_wrapper)
+    )
+
+    :telemetry.execute(
+      [:phoenix, :endpoint, :stop],
+      %{duration: 444},
+      Meta.endpoint_stop(:exception)
+    )
+
+    expected_status = OpenTelemetry.status(:InternalError, "Internal Error")
+
+    assert_receive {:span,
+                    span(
+                      name: "GET /users/:user_id/exception",
+                      attributes: list,
+                      kind: :SERVER,
+                      events: [
+                        event(
+                          name: "exception",
+                          attributes: [
+                            type: :error,
+                            stacktrace: stacktrace,
+                            reason: :badarith
+                          ]
+                        )
+                      ],
+                      status: ^expected_status
+                    )}
+
+    assert [
+             "http.client_ip": "10.211.55.2",
+             "http.flavor": :"1.1",
+             "http.host": "localhost",
+             "http.method": "GET",
+             "http.scheme": "http",
+             "http.status": 500,
+             "http.target": "/users/123/exception",
+             "http.user_agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:81.0) Gecko/20100101 Firefox/81.0",
              "net.host.ip": "10.211.55.2",
              "net.host.port": 4000,
              "net.peer.ip": "10.211.55.2",

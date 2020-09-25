@@ -27,6 +27,7 @@ defmodule OpentelemetryPhoenix do
   require OpenTelemetry.Tracer
   require OpenTelemetry.Span
   alias OpenTelemetry.{Span, Tracer}
+  alias OpentelemetryPhoenix.Reason
 
   @typedoc "Setup options"
   @type opts :: [endpoint_prefix()]
@@ -151,14 +152,17 @@ defmodule OpentelemetryPhoenix do
   def handle_router_dispatch_exception(
         _event,
         _measurements,
-        %{kind: kind, error: %{reason: reason}, stacktrace: stacktrace},
+        %{kind: kind, reason: reason, stacktrace: stacktrace},
         _config
       ) do
-    exception_attrs = [
-      type: kind,
-      reason: reason,
-      stacktrace: Exception.format_stacktrace(stacktrace)
-    ]
+    exception_attrs =
+      Keyword.merge(
+        [
+          type: kind,
+          stacktrace: Exception.format_stacktrace(stacktrace)
+        ],
+        Reason.normalize(reason)
+      )
 
     Span.add_event("exception", exception_attrs)
   end
