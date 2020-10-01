@@ -20,6 +20,10 @@ defmodule OpentelemetryPhoenix.Reason do
     [reason: :cond_clause]
   end
 
+  def normalize(:undef) do
+    [reason: :undef]
+  end
+
   def normalize({:badarity, {fun, args}}) do
     {:arity, arity} = Function.info(fun, :arity)
     [reason: :badarity, function: "#{inspect(fun)}", arity: arity, args: args]
@@ -67,6 +71,10 @@ defmodule OpentelemetryPhoenix.Reason do
 
   def normalize({:badarg, payload}) do
     [reason: :badarg, payload: payload]
+  end
+
+  def normalize(other) do
+    [reason: :other, unhandled: true, other: "#{inspect(other)}"]
   end
 
   def normalize(other, _stacktrace) do
