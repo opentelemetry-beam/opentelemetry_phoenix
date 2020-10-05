@@ -1,7 +1,7 @@
 defmodule OpentelemetryPhoenix.Reason do
-  def normalize(reason) when is_struct(reason) do
+  def normalize(%{reason: reason}) when is_struct(reason) do
     # %Plug.Conn.WrapperError{}
-    normalize(reason.reason)
+    normalize(reason)
   end
 
   def normalize(:badarg) do
@@ -74,10 +74,10 @@ defmodule OpentelemetryPhoenix.Reason do
   end
 
   def normalize(other) do
-    [reason: :other, unhandled: true, other: "#{inspect(other)}"]
+    [reason: other]
   end
 
   def normalize(other, _stacktrace) do
-    [reason: :other, unhandled: true, other: "#{inspect(other)}"]
+    [reason: other]
   end
 end
