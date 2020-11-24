@@ -8,7 +8,7 @@ defmodule OpentelemetryPhoenixTest do
 
   alias PhoenixMeta, as: Meta
 
-  for {name, spec} <- Record.extract_all(from_lib: "opentelemetry/include/ot_span.hrl") do
+  for {name, spec} <- Record.extract_all(from_lib: "opentelemetry/include/otel_span.hrl") do
     Record.defrecord(name, spec)
   end
 
@@ -18,15 +18,15 @@ defmodule OpentelemetryPhoenixTest do
 
   setup do
     :application.stop(:opentelemetry)
-    :application.set_env(:opentelemetry, :tracer, :ot_tracer_default)
+    :application.set_env(:opentelemetry, :tracer, :otel_tracer_default)
 
     :application.set_env(:opentelemetry, :processors, [
-      {:ot_batch_processor, %{scheduled_delay_ms: 1}}
+      {:otel_batch_processor, %{scheduled_delay_ms: 1}}
     ])
 
     :application.start(:opentelemetry)
 
-    :ot_batch_processor.set_exporter(:ot_exporter_pid, self())
+    :otel_batch_processor.set_exporter(:otel_exporter_pid, self())
     :ok
   end
 
@@ -51,13 +51,10 @@ defmodule OpentelemetryPhoenixTest do
       Meta.endpoint_stop()
     )
 
-    expected_status = OpenTelemetry.status(:Ok, "Ok")
-
     assert_receive {:span,
                     span(
                       name: "GET /users/:user_id",
-                      attributes: list,
-                      status: ^expected_status
+                      attributes: list
                     )}
 
     assert [
@@ -106,7 +103,7 @@ defmodule OpentelemetryPhoenixTest do
       Meta.endpoint_stop(:exception)
     )
 
-    expected_status = OpenTelemetry.status(:InternalError, "Internal Error")
+    expected_status = OpenTelemetry.status(:Error, "Error")
 
     assert_receive {:span,
                     span(
@@ -174,7 +171,7 @@ defmodule OpentelemetryPhoenixTest do
       Meta.endpoint_stop(:exception)
     )
 
-    expected_status = OpenTelemetry.status(:InternalError, "Internal Error")
+    expected_status = OpenTelemetry.status(:Error, "Error")
 
     assert_receive {:span,
                     span(
