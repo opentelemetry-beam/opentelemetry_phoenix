@@ -100,11 +100,9 @@ defmodule OpentelemetryPhoenix do
   def handle_endpoint_start(_event, _measurements, %{conn: %{adapter: adapter} = conn}, _config) do
     # TODO: maybe add config for what paths are traced? Via sampler?
     :otel_propagator.text_map_extract(conn.req_headers)
-    parent_ctx = Tracer.current_span_ctx()
 
     span_name = "HTTP #{conn.method}"
-
-    new_ctx = Tracer.start_span(span_name, %{kind: :SERVER, parent: parent_ctx})
+    new_ctx = Tracer.start_span(span_name, %{kind: :SERVER})
     _ = Tracer.set_current_span(new_ctx)
 
     peer_data = Plug.Conn.get_peer_data(conn)
