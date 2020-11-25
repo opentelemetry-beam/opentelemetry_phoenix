@@ -25,7 +25,6 @@ defmodule OpentelemetryPhoenix do
   """
 
   require OpenTelemetry.Tracer
-  require OpenTelemetry.Span
   alias OpenTelemetry.{Span, Tracer}
   alias OpentelemetryPhoenix.Reason
 
@@ -100,11 +99,11 @@ defmodule OpentelemetryPhoenix do
   @doc false
   def handle_endpoint_start(_event, _measurements, %{conn: %{adapter: adapter} = conn}, _config) do
     # TODO: maybe add config for what paths are traced? Via sampler?
-    ctx = :ot_propagation.http_extract(conn.req_headers)
+    :otel_propagator.text_map_extract(conn.req_headers)
 
     span_name = "HTTP #{conn.method}"
-
-    Tracer.start_span(span_name, %{kind: :SERVER, parent: ctx})
+    new_ctx = Tracer.start_span(span_name, %{kind: :SERVER})
+    _ = Tracer.set_current_span(new_ctx)
 
     peer_data = Plug.Conn.get_peer_data(conn)
 
@@ -126,26 +125,26 @@ defmodule OpentelemetryPhoenix do
       "net.transport": :"IP.TCP"
     ]
 
-    Span.set_attributes(attributes)
+    Span.set_attributes(new_ctx, attributes)
   end
 
   @doc false
   def handle_endpoint_stop(_event, _measurements, %{conn: conn}, _config) do
-    Span.set_attribute(:"http.status", conn.status)
-    :ot_http_status.to_status(conn.status) |> Span.set_status()
-    Tracer.end_span()
+    span_ctx = Tracer.current_span_ctx()
+    Span.set_attribute(span_ctx, :"http.status", conn.status)
+    Span.end_span(span_ctx)
   end
 
   @doc false
   def handle_router_dispatch_start(_event, _measurements, meta, _config) do
-    Span.update_name("#{meta.conn.method} #{meta.route}")
-
     attributes = [
       "phoenix.plug": meta.plug,
       "phoenix.action": meta.plug_opts
     ]
 
-    Span.set_attributes(attributes)
+    span_ctx = Tracer.current_span_ctx()
+    Span.update_name(span_ctx, "#{meta.conn.method} #{meta.route}")
+    Span.set_attributes(span_ctx, attributes)
   end
 
   @doc false
@@ -164,7 +163,11 @@ defmodule OpentelemetryPhoenix do
         Reason.normalize(reason)
       )
 
-    Span.add_event("exception", exception_attrs)
+    status = OpenTelemetry.status(:Error, "Error")
+    span_ctx = Tracer.current_span_ctx()
+
+    Span.add_event(span_ctx, "exception", exception_attrs)
+    Span.set_status(span_ctx, status)
   end
 
   defp http_flavor({_adapter_name, meta}) do
