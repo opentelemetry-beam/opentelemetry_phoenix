@@ -38,8 +38,9 @@ defmodule OpentelemetryPhoenix do
   def setup(_opts \\ []) do
     _ = OpenTelemetry.register_application_tracer(:opentelemetry_phoenix)
     attach_router_dispatch_start_handler()
-    attach_phoenix_endpoint_stop_handler()
+    attach_router_dispatch_stop_handler()
     attach_router_dispatch_exception_handler()
+    attach_phoenix_endpoint_stop_handler()
 
     :ok
   end
@@ -55,11 +56,11 @@ defmodule OpentelemetryPhoenix do
   end
 
   @doc false
-  def attach_phoenix_endpoint_stop_handler do
+  def attach_router_dispatch_stop_handler do
     :telemetry.attach(
-      {__MODULE__, :phoenix_endpoint_stop},
-      [:phoenix, :endpoint, :stop],
-      &__MODULE__.handle_phoenix_endpoint_stop/4,
+      {__MODULE__, :router_dispatch_stop},
+      [:phoenix, :router_dispatch, :stop],
+      &__MODULE__.handle_request_stop/4,
       %{}
     )
   end
@@ -70,6 +71,16 @@ defmodule OpentelemetryPhoenix do
       {__MODULE__, :router_dispatch_exception},
       [:phoenix, :router_dispatch, :exception],
       &__MODULE__.handle_router_dispatch_exception/4,
+      %{}
+    )
+  end
+
+  @doc false
+  def attach_phoenix_endpoint_stop_handler do
+    :telemetry.attach(
+      {__MODULE__, :phoenix_endpoint_stop},
+      [:phoenix, :endpoint, :stop],
+      &__MODULE__.handle_request_stop/4,
       %{}
     )
   end
@@ -110,7 +121,7 @@ defmodule OpentelemetryPhoenix do
   end
 
   @doc false
-  def handle_phoenix_endpoint_stop(_event, _measurements, %{conn: conn}, _config) do
+  def handle_request_stop(_event, _measurements, %{conn: conn}, _config) do
     span_ctx = Tracer.current_span_ctx()
     Span.set_attribute(span_ctx, :"http.status", conn.status)
     Span.end_span(span_ctx)
