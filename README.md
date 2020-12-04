@@ -22,7 +22,7 @@ may be supplied.
 ```elixir
 def deps do
   [
-    {:opentelemetry_phoenix, "~> 0.1.0"}
+    {:opentelemetry_phoenix, "~> 0.2.0"}
   ]
 end
 ```
