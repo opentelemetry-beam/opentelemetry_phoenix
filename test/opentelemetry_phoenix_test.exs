@@ -34,12 +34,6 @@ defmodule OpentelemetryPhoenixTest do
     OpentelemetryPhoenix.setup()
 
     :telemetry.execute(
-      [:phoenix, :endpoint, :start],
-      %{system_time: System.system_time()},
-      Meta.endpoint_start()
-    )
-
-    :telemetry.execute(
       [:phoenix, :router_dispatch, :start],
       %{system_time: System.system_time()},
       Meta.router_dispatch_start()
@@ -78,12 +72,6 @@ defmodule OpentelemetryPhoenixTest do
 
   test "records exceptions for Phoenix web requests" do
     OpentelemetryPhoenix.setup()
-
-    :telemetry.execute(
-      [:phoenix, :endpoint, :start],
-      %{system_time: System.system_time()},
-      Meta.endpoint_start(:exception)
-    )
 
     :telemetry.execute(
       [:phoenix, :router_dispatch, :start],
@@ -146,12 +134,6 @@ defmodule OpentelemetryPhoenixTest do
 
   test "records exceptions for Phoenix web requests with plug wrappers" do
     OpentelemetryPhoenix.setup()
-
-    :telemetry.execute(
-      [:phoenix, :endpoint, :start],
-      %{system_time: System.system_time()},
-      Meta.endpoint_start(:exception)
-    )
 
     :telemetry.execute(
       [:phoenix, :router_dispatch, :start],

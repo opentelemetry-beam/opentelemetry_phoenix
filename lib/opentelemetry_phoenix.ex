@@ -29,59 +29,37 @@ defmodule OpentelemetryPhoenix do
   alias OpentelemetryPhoenix.Reason
 
   @typedoc "Setup options"
-  @type opts :: [endpoint_prefix()]
-
-  @typedoc "The endpoint prefix in your endpoint. Defaults to `[:phoenix, :endpoint]`"
-  @type endpoint_prefix :: {:endpoint_prefix, [atom()]}
+  @type opts :: keyword()
 
   @doc """
   Initializes and configures the telemetry handlers.
   """
   @spec setup(opts()) :: :ok
-  def setup(opts \\ []) do
-    opts = ensure_opts(opts)
-
+  def setup(_opts \\ []) do
     _ = OpenTelemetry.register_application_tracer(:opentelemetry_phoenix)
-    attach_endpoint_start_handler(opts)
-    attach_endpoint_stop_handler(opts)
-    attach_router_start_handler()
+    attach_router_dispatch_start_handler()
+    attach_phoenix_endpoint_stop_handler()
     attach_router_dispatch_exception_handler()
 
     :ok
   end
 
-  defp ensure_opts(opts), do: Keyword.merge(default_opts(), opts)
-
-  defp default_opts do
-    [endpoint_prefix: [:phoenix, :endpoint]]
-  end
-
   @doc false
-  def attach_endpoint_start_handler(opts) do
-    :telemetry.attach(
-      {__MODULE__, :endpoint_start},
-      opts[:endpoint_prefix] ++ [:start],
-      &__MODULE__.handle_endpoint_start/4,
-      %{}
-    )
-  end
-
-  @doc false
-  def attach_endpoint_stop_handler(opts) do
-    :telemetry.attach(
-      {__MODULE__, :endpoint_stop},
-      opts[:endpoint_prefix] ++ [:stop],
-      &__MODULE__.handle_endpoint_stop/4,
-      %{}
-    )
-  end
-
-  @doc false
-  def attach_router_start_handler do
+  def attach_router_dispatch_start_handler do
     :telemetry.attach(
       {__MODULE__, :router_dispatch_start},
       [:phoenix, :router_dispatch, :start],
       &__MODULE__.handle_router_dispatch_start/4,
+      %{}
+    )
+  end
+
+  @doc false
+  def attach_phoenix_endpoint_stop_handler do
+    :telemetry.attach(
+      {__MODULE__, :phoenix_endpoint_stop},
+      [:phoenix, :endpoint, :stop],
+      &__MODULE__.handle_phoenix_endpoint_stop/4,
       %{}
     )
   end
@@ -97,11 +75,12 @@ defmodule OpentelemetryPhoenix do
   end
 
   @doc false
-  def handle_endpoint_start(_event, _measurements, %{conn: %{adapter: adapter} = conn}, _config) do
+  def handle_router_dispatch_start(_event, _measurements, %{conn: conn} = meta, _config) do
     # TODO: maybe add config for what paths are traced? Via sampler?
     :otel_propagator.text_map_extract(conn.req_headers)
 
-    span_name = "HTTP #{conn.method}"
+    span_name = "#{conn.method} #{meta.route}"
+
     new_ctx = Tracer.start_span(span_name, %{kind: :SERVER})
     _ = Tracer.set_current_span(new_ctx)
 
@@ -111,8 +90,10 @@ defmodule OpentelemetryPhoenix do
     peer_ip = Map.get(peer_data, :address)
 
     attributes = [
+      "phoenix.plug": meta.plug,
+      "phoenix.action": meta.plug_opts,
       "http.client_ip": client_ip(conn),
-      "http.flavor": http_flavor(adapter),
+      "http.flavor": http_flavor(conn.adapter),
       "http.host": conn.host,
       "http.method": conn.method,
       "http.scheme": "#{conn.scheme}",
@@ -129,22 +110,10 @@ defmodule OpentelemetryPhoenix do
   end
 
   @doc false
-  def handle_endpoint_stop(_event, _measurements, %{conn: conn}, _config) do
+  def handle_phoenix_endpoint_stop(_event, _measurements, %{conn: conn}, _config) do
     span_ctx = Tracer.current_span_ctx()
     Span.set_attribute(span_ctx, :"http.status", conn.status)
     Span.end_span(span_ctx)
-  end
-
-  @doc false
-  def handle_router_dispatch_start(_event, _measurements, meta, _config) do
-    attributes = [
-      "phoenix.plug": meta.plug,
-      "phoenix.action": meta.plug_opts
-    ]
-
-    span_ctx = Tracer.current_span_ctx()
-    Span.update_name(span_ctx, "#{meta.conn.method} #{meta.route}")
-    Span.set_attributes(span_ctx, attributes)
   end
 
   @doc false
