@@ -115,7 +115,7 @@ defmodule OpentelemetryPhoenixTest do
                           name: "exception",
                           attributes: [
                             type: :error,
-                            stacktrace: stacktrace,
+                            stacktrace: _stacktrace,
                             reason: :badkey,
                             key: :name,
                             map: %{username: "rick"}
@@ -183,7 +183,7 @@ defmodule OpentelemetryPhoenixTest do
                           name: "exception",
                           attributes: [
                             type: :error,
-                            stacktrace: stacktrace,
+                            stacktrace: _stacktrace,
                             reason: :badarith
                           ]
                         )

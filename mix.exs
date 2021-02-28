@@ -49,8 +49,8 @@ defmodule OpentelemetryPhoenix.MixProject do
   # Run "mix help deps" to learn about dependencies.
   defp deps do
     [
-      {:opentelemetry, "~> 0.5.0"},
-      {:opentelemetry_api, "~> 0.5.0"},
+      {:opentelemetry, "~> 0.6.0"},
+      {:opentelemetry_api, "~> 0.6.0"},
       {:telemetry, "~> 0.4"},
       {:plug, "~> 1.10", only: [:dev, :test]},
       {:ex_doc, "~> 0.21.0", only: [:dev], runtime: false},
