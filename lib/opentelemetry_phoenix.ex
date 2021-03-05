@@ -56,6 +56,8 @@ defmodule OpentelemetryPhoenix do
     [endpoint_prefix: [:phoenix, :endpoint]]
   end
 
+  @spec attach_endpoint_start_handler(nil | maybe_improper_list | map) ::
+          :ok | {:error, :already_exists}
   @doc false
   def attach_endpoint_start_handler(opts) do
     :telemetry.attach(
@@ -110,6 +112,11 @@ defmodule OpentelemetryPhoenix do
     user_agent = header_value(conn, "user-agent")
     peer_ip = Map.get(peer_data, :address)
 
+    request_id = case Logger.metadata() do
+      [request_id: value] -> value
+      _ -> nil
+    end
+
     attributes = [
       "http.client_ip": client_ip(conn),
       "http.flavor": http_flavor(adapter),
@@ -122,7 +129,8 @@ defmodule OpentelemetryPhoenix do
       "net.host.port": conn.port,
       "net.peer.ip": to_string(:inet_parse.ntoa(peer_ip)),
       "net.peer.port": peer_data.port,
-      "net.transport": :"IP.TCP"
+      "net.transport": :"IP.TCP",
+      "request_id": request_id
     ]
 
     Span.set_attributes(new_ctx, attributes)
@@ -139,7 +147,8 @@ defmodule OpentelemetryPhoenix do
   def handle_router_dispatch_start(_event, _measurements, meta, _config) do
     attributes = [
       "phoenix.plug": meta.plug,
-      "phoenix.action": meta.plug_opts
+      "phoenix.action": meta.plug_opts,
+      "http.target": meta.route
     ]
 
     span_ctx = Tracer.current_span_ctx()
