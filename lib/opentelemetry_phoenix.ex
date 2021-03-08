@@ -44,8 +44,8 @@ defmodule OpentelemetryPhoenix do
     _ = OpenTelemetry.register_application_tracer(:opentelemetry_phoenix)
     attach_endpoint_start_handler(opts)
     attach_endpoint_stop_handler(opts)
-    attach_router_start_handler()
-    attach_router_dispatch_exception_handler()
+    attach_router_start_handler(opts)
+    attach_router_dispatch_exception_handler(opts)
 
     :ok
   end
@@ -64,7 +64,7 @@ defmodule OpentelemetryPhoenix do
       {__MODULE__, :endpoint_start},
       opts[:endpoint_prefix] ++ [:start],
       &__MODULE__.handle_endpoint_start/4,
-      %{}
+      opts
     )
   end
 
@@ -74,7 +74,7 @@ defmodule OpentelemetryPhoenix do
       {__MODULE__, :endpoint_stop},
       opts[:endpoint_prefix] ++ [:stop],
       &__MODULE__.handle_endpoint_stop/4,
-      %{}
+      opts
     )
   end
 
@@ -84,7 +84,7 @@ defmodule OpentelemetryPhoenix do
       {__MODULE__, :router_dispatch_start},
       [:phoenix, :router_dispatch, :start],
       &__MODULE__.handle_router_dispatch_start/4,
-      %{}
+      opts
     )
   end
 
@@ -94,12 +94,12 @@ defmodule OpentelemetryPhoenix do
       {__MODULE__, :router_dispatch_exception},
       [:phoenix, :router_dispatch, :exception],
       &__MODULE__.handle_router_dispatch_exception/4,
-      %{}
+      opts
     )
   end
 
   @doc false
-  def handle_endpoint_start(_event, _measurements, %{conn: %{adapter: adapter} = conn}, _config) do
+  def handle_endpoint_start(_event, _measurements, %{conn: %{adapter: adapter} = conn}, config) do
     # TODO: maybe add config for what paths are traced? Via sampler?
     :otel_propagator.text_map_extract(conn.req_headers)
 
@@ -111,11 +111,6 @@ defmodule OpentelemetryPhoenix do
 
     user_agent = header_value(conn, "user-agent")
     peer_ip = Map.get(peer_data, :address)
-
-    request_id = case Logger.metadata() do
-      [request_id: value] -> value
-      _ -> nil
-    end
 
     attributes = [
       "http.client_ip": client_ip(conn),
@@ -129,9 +124,8 @@ defmodule OpentelemetryPhoenix do
       "net.host.port": conn.port,
       "net.peer.ip": to_string(:inet_parse.ntoa(peer_ip)),
       "net.peer.port": peer_data.port,
-      "net.transport": :"IP.TCP",
-      "request_id": request_id
-    ]
+      "net.transport": :"IP.TCP"
+    ] ++ build_additional_attributes(config)
 
     Span.set_attributes(new_ctx, attributes)
   end
@@ -209,4 +203,12 @@ defmodule OpentelemetryPhoenix do
         value
     end
   end
+
+  defp build_additional_attributes([additional_attributes: {func, args}]), do:
+    apply(func, args)
+
+  defp build_additional_attributes([additional_attributes: attributes]) when is_list(attributes), do:
+    attributes
+
+  defp build_additional_attributes(), do: []
 end
