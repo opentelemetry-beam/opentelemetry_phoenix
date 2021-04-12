@@ -5,7 +5,7 @@ defmodule OpentelemetryPhoenix.MixProject do
     [
       app: :opentelemetry_phoenix,
       description: description(),
-      version: "0.2.0",
+      version: "1.0.0-rc.1",
       elixir: "~> 1.10",
       start_permanent: Mix.env() == :prod,
       dialyzer: [
@@ -54,14 +54,14 @@ defmodule OpentelemetryPhoenix.MixProject do
   # Run "mix help deps" to learn about dependencies.
   defp deps do
     [
-      {:opentelemetry, "~> 0.5.0"},
-      {:opentelemetry_api, "~> 0.5.0"},
+      {:opentelemetry_api, "~> 1.0.0-rc", allow_pre: true},
+      {:opentelemetry, "~> 1.0.0-rc", allow_pre: true},
+      {:opentelemetry_telemetry, "~> 1.0.0-beta", allow_pre: true},
       {:telemetry, "~> 0.4"},
       {:plug, "~> 1.10", only: [:dev, :test]},
       {:ex_doc, "~> 0.21.0", only: [:dev], runtime: false},
       {:plug_cowboy, "~> 2.3", only: [:test]},
-      {:dialyxir,
-       github: "jeremyjh/dialyxir", ref: "e18cc40a667d5f3ccd239f11eecaa1f23fb7fa8c", only: [:dev, :test], runtime: false}
+      {:dialyxir, "~> 1.1", only: [:dev, :test], runtime: false}
     ]
   end
 end
