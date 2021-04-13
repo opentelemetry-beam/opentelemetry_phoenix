@@ -15,7 +15,7 @@ jobs:
     strategy:
       matrix:
         otp_version: ['23.0.2', '22.3.4.2', '21.3.8.16']
-        elixir: ['1.10.4']
+        elixir: ['1.10.4', '1.11.4']
     steps:
       - uses: actions/checkout@v2
       - uses: erlef/setup-elixir@v1
@@ -52,7 +52,7 @@ jobs:
         id: plt-cache
         with:
           path: priv/plts
-          key: ${{ runner.os }}-plts-${{ matrix.otp_version }}-${{ matrix.elixir }}-v2-${{ hashFiles('mix.lock') }}
+          key: ${{ runner.os }}-plts-${{ matrix.otp_version }}-${{ matrix.elixir }}-${{ hashFiles('mix.lock') }}
           restore-keys: |
             ${{ runner.os }}-plts-${{ matrix.otp_version }}-${{ matrix.elixir }}-
 

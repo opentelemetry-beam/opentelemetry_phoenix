@@ -58,9 +58,9 @@ defmodule OpentelemetryPhoenix.MixProject do
       {:opentelemetry, "~> 1.0.0-rc", allow_pre: true},
       {:opentelemetry_telemetry, "~> 1.0.0-beta", allow_pre: true},
       {:telemetry, "~> 0.4"},
-      {:plug, "~> 1.10", only: [:dev, :test]},
-      {:ex_doc, "~> 0.21.0", only: [:dev], runtime: false},
-      {:plug_cowboy, "~> 2.3", only: [:test]},
+      {:plug, "~> 1.11", only: [:dev, :test]},
+      {:ex_doc, "~> 0.24", only: [:dev], runtime: false},
+      {:plug_cowboy, "~> 2.4", only: [:test]},
       {:dialyxir, "~> 1.1", only: [:dev, :test], runtime: false}
     ]
   end
