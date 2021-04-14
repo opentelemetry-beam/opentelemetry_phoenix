@@ -25,8 +25,10 @@ defmodule OpentelemetryPhoenix do
   """
 
   require OpenTelemetry.Tracer
-  alias OpenTelemetry.{Span, Tracer}
+  alias OpenTelemetry.Span
   alias OpentelemetryPhoenix.Reason
+
+  @tracer_id :opentelemetry_phoenix
 
   @typedoc "Setup options"
   @type opts :: [endpoint_prefix()]
@@ -41,7 +43,8 @@ defmodule OpentelemetryPhoenix do
   def setup(opts \\ []) do
     opts = ensure_opts(opts)
 
-    _ = OpenTelemetry.register_application_tracer(:opentelemetry_phoenix)
+    OpenTelemetry.register_application_tracer(@tracer_id)
+
     attach_endpoint_start_handler(opts)
     attach_endpoint_stop_handler(opts)
     attach_router_start_handler()
@@ -101,10 +104,6 @@ defmodule OpentelemetryPhoenix do
     # TODO: maybe add config for what paths are traced? Via sampler?
     :otel_propagator.text_map_extract(conn.req_headers)
 
-    # start the span with a default name. Route name isn't known until router dispatch
-    ctx =
-      OpentelemetryTelemetry.start_telemetry_span(:opentelemetry_phoenix, "HTTP #{conn.method}", meta, %{kind: :SERVER})
-
     peer_data = Plug.Conn.get_peer_data(conn)
 
     user_agent = header_value(conn, "user-agent")
@@ -125,17 +124,19 @@ defmodule OpentelemetryPhoenix do
       "net.transport": :"IP.TCP"
     ]
 
-    Span.set_attributes(ctx, attributes)
+    # start the span with a default name. Route name isn't known until router dispatch
+    OpentelemetryTelemetry.start_telemetry_span(@tracer_id, "HTTP #{conn.method}", meta, %{kind: :server})
+    |> Span.set_attributes(attributes)
   end
 
   @doc false
   def handle_endpoint_stop(_event, _measurements, %{conn: conn} = meta, _config) do
     # ensure the correct span is current and update the status
-    OpentelemetryTelemetry.set_current_telemetry_span(:opentelemetry_phoenix, meta)
+    OpentelemetryTelemetry.set_current_telemetry_span(@tracer_id, meta)
     |> Span.set_attribute(:"http.status", conn.status)
 
     # end the Phoenix span
-    OpentelemetryTelemetry.end_telemetry_span(:opentelemetry_phoenix, meta)
+    OpentelemetryTelemetry.end_telemetry_span(@tracer_id, meta)
   end
 
   @doc false
@@ -146,7 +147,7 @@ defmodule OpentelemetryPhoenix do
     ]
 
     # Add more info that we now know about but don't close the span
-    ctx = OpentelemetryTelemetry.set_current_telemetry_span(:opentelemetry_phoenix, meta)
+    ctx = OpentelemetryTelemetry.set_current_telemetry_span(@tracer_id, meta)
     Span.update_name(ctx, "#{meta.conn.method} #{meta.route}")
     Span.set_attributes(ctx, attributes)
   end
@@ -158,11 +159,11 @@ defmodule OpentelemetryPhoenix do
         %{kind: kind, reason: reason, stacktrace: stacktrace} = meta,
         _config
       ) do
+    ctx = OpentelemetryTelemetry.set_current_telemetry_span(@tracer_id, meta)
+
     {[reason: reason], attrs} =
       Reason.normalize(reason)
       |> Keyword.split([:reason])
-
-    ctx = OpentelemetryTelemetry.set_current_telemetry_span(:opentelemetry_phoenix, meta)
 
     # try to normalize all errors to Elixir exceptions
     exception = Exception.normalize(kind, reason, stacktrace)
