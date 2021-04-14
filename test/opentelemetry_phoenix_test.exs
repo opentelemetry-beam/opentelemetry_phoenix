@@ -109,7 +109,7 @@ defmodule OpentelemetryPhoenixTest do
                     span(
                       name: "GET /users/:user_id/exception",
                       attributes: list,
-                      kind: :SERVER,
+                      kind: :server,
                       events: [
                         event(
                           name: "exception",
@@ -177,7 +177,7 @@ defmodule OpentelemetryPhoenixTest do
                     span(
                       name: "GET /users/:user_id/exception",
                       attributes: list,
-                      kind: :SERVER,
+                      kind: :server,
                       events: [
                         event(
                           name: "exception",
