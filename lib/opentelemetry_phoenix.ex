@@ -101,12 +101,9 @@ defmodule OpentelemetryPhoenix do
     # TODO: maybe add config for what paths are traced? Via sampler?
     :otel_propagator.text_map_extract(conn.req_headers)
 
-    # store the current ctx
-    OpentelemetryTelemetry.store_current_ctx(:opentelemetry_phoenix, meta)
-
     # start the span with a default name. Route name isn't known until router dispatch
-    new_ctx = Tracer.start_span("HTTP #{conn.method}", %{kind: :SERVER})
-    _ = Tracer.set_current_span(new_ctx)
+    ctx =
+      OpentelemetryTelemetry.start_telemetry_span(:opentelemetry_phoenix, "HTTP #{conn.method}", meta, %{kind: :SERVER})
 
     peer_data = Plug.Conn.get_peer_data(conn)
 
@@ -128,18 +125,17 @@ defmodule OpentelemetryPhoenix do
       "net.transport": :"IP.TCP"
     ]
 
-    Span.set_attributes(new_ctx, attributes)
+    Span.set_attributes(ctx, attributes)
   end
 
   @doc false
   def handle_endpoint_stop(_event, _measurements, %{conn: conn} = meta, _config) do
-    Tracer.set_attribute(:"http.status", conn.status)
-    # end the Phoenix span
-    Tracer.end_span()
+    # ensure the correct span is current and update the status
+    OpentelemetryTelemetry.set_current_telemetry_span(:opentelemetry_phoenix, meta)
+    |> Span.set_attribute(:"http.status", conn.status)
 
-    # pop the parent span ctx from before the phoenix span and restore it as current
-    parent_span_ctx = OpentelemetryTelemetry.pop_ctx(:opentelemetry_phoenix, meta)
-    Tracer.set_current_span(parent_span_ctx)
+    # end the Phoenix span
+    OpentelemetryTelemetry.end_telemetry_span(:opentelemetry_phoenix, meta)
   end
 
   @doc false
@@ -150,30 +146,30 @@ defmodule OpentelemetryPhoenix do
     ]
 
     # Add more info that we now know about but don't close the span
-    Tracer.update_name("#{meta.conn.method} #{meta.route}")
-    Tracer.set_attributes(attributes)
+    ctx = OpentelemetryTelemetry.set_current_telemetry_span(:opentelemetry_phoenix, meta)
+    Span.update_name(ctx, "#{meta.conn.method} #{meta.route}")
+    Span.set_attributes(ctx, attributes)
   end
 
   @doc false
   def handle_router_dispatch_exception(
         _event,
         _measurements,
-        %{kind: kind, reason: reason, stacktrace: stacktrace},
+        %{kind: kind, reason: reason, stacktrace: stacktrace} = meta,
         _config
       ) do
     {[reason: reason], attrs} =
       Reason.normalize(reason)
       |> Keyword.split([:reason])
 
+    ctx = OpentelemetryTelemetry.set_current_telemetry_span(:opentelemetry_phoenix, meta)
+
     # try to normalize all errors to Elixir exceptions
     exception = Exception.normalize(kind, reason, stacktrace)
 
-    Tracer.current_span_ctx()
-    |> Span.record_exception(exception, stacktrace, attrs)
-
-    # mark the span as errored
-    OpenTelemetry.status(:error, "Error")
-    |> Tracer.set_status()
+    # record exception and mark the span as errored
+    Span.record_exception(ctx, exception, stacktrace, attrs)
+    Span.set_status(ctx, OpenTelemetry.status(:error, "Error"))
 
     # do not close the span as endpoint stop will still be called with
     # more info, including the status code, which is nil at this stage
