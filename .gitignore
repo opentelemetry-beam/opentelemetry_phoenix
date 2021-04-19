@@ -24,3 +24,5 @@ opentelemetry_phoenix-*.tar
 
 test/support/deps/
 test/support/_build/
+
+priv

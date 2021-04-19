@@ -103,22 +103,22 @@ defmodule OpentelemetryPhoenixTest do
       Meta.endpoint_stop(:exception)
     )
 
-    expected_status = OpenTelemetry.status(:Error, "Error")
+    expected_status = OpenTelemetry.status(:error, "Error")
 
     assert_receive {:span,
                     span(
                       name: "GET /users/:user_id/exception",
                       attributes: list,
-                      kind: :SERVER,
+                      kind: :server,
                       events: [
                         event(
                           name: "exception",
                           attributes: [
-                            type: :error,
-                            stacktrace: stacktrace,
-                            reason: :badkey,
-                            key: :name,
-                            map: %{username: "rick"}
+                            {"exception.type", "Elixir.ErlangError"},
+                            {"exception.message", "Erlang error: :badkey"},
+                            {"exception.stacktrace", _stacktrace},
+                            {:key, :name},
+                            {:map, %{username: "rick"}}
                           ]
                         )
                       ],
@@ -171,20 +171,20 @@ defmodule OpentelemetryPhoenixTest do
       Meta.endpoint_stop(:exception)
     )
 
-    expected_status = OpenTelemetry.status(:Error, "Error")
+    expected_status = OpenTelemetry.status(:error, "Error")
 
     assert_receive {:span,
                     span(
                       name: "GET /users/:user_id/exception",
                       attributes: list,
-                      kind: :SERVER,
+                      kind: :server,
                       events: [
                         event(
                           name: "exception",
                           attributes: [
-                            type: :error,
-                            stacktrace: stacktrace,
-                            reason: :badarith
+                            {"exception.type", "Elixir.ArithmeticError"},
+                            {"exception.message", "bad argument in arithmetic expression"},
+                            {"exception.stacktrace", _stacktrace}
                           ]
                         )
                       ],

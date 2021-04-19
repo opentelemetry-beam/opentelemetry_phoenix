@@ -25,8 +25,10 @@ defmodule OpentelemetryPhoenix do
   """
 
   require OpenTelemetry.Tracer
-  alias OpenTelemetry.{Span, Tracer}
+  alias OpenTelemetry.Span
   alias OpentelemetryPhoenix.Reason
+
+  @tracer_id :opentelemetry_phoenix
 
   @typedoc "Setup options"
   @type opts :: [endpoint_prefix()]
@@ -41,7 +43,8 @@ defmodule OpentelemetryPhoenix do
   def setup(opts \\ []) do
     opts = ensure_opts(opts)
 
-    _ = OpenTelemetry.register_application_tracer(:opentelemetry_phoenix)
+    OpenTelemetry.register_application_tracer(@tracer_id)
+
     attach_endpoint_start_handler(opts)
     attach_endpoint_stop_handler(opts)
     attach_router_start_handler()
@@ -97,13 +100,9 @@ defmodule OpentelemetryPhoenix do
   end
 
   @doc false
-  def handle_endpoint_start(_event, _measurements, %{conn: %{adapter: adapter} = conn}, _config) do
+  def handle_endpoint_start(_event, _measurements, %{conn: %{adapter: adapter} = conn} = meta, _config) do
     # TODO: maybe add config for what paths are traced? Via sampler?
     :otel_propagator.text_map_extract(conn.req_headers)
-
-    span_name = "HTTP #{conn.method}"
-    new_ctx = Tracer.start_span(span_name, %{kind: :SERVER})
-    _ = Tracer.set_current_span(new_ctx)
 
     peer_data = Plug.Conn.get_peer_data(conn)
 
@@ -125,14 +124,19 @@ defmodule OpentelemetryPhoenix do
       "net.transport": :"IP.TCP"
     ]
 
-    Span.set_attributes(new_ctx, attributes)
+    # start the span with a default name. Route name isn't known until router dispatch
+    OpentelemetryTelemetry.start_telemetry_span(@tracer_id, "HTTP #{conn.method}", meta, %{kind: :server})
+    |> Span.set_attributes(attributes)
   end
 
   @doc false
-  def handle_endpoint_stop(_event, _measurements, %{conn: conn}, _config) do
-    span_ctx = Tracer.current_span_ctx()
-    Span.set_attribute(span_ctx, :"http.status", conn.status)
-    Span.end_span(span_ctx)
+  def handle_endpoint_stop(_event, _measurements, %{conn: conn} = meta, _config) do
+    # ensure the correct span is current and update the status
+    OpentelemetryTelemetry.set_current_telemetry_span(@tracer_id, meta)
+    |> Span.set_attribute(:"http.status", conn.status)
+
+    # end the Phoenix span
+    OpentelemetryTelemetry.end_telemetry_span(@tracer_id, meta)
   end
 
   @doc false
@@ -142,32 +146,34 @@ defmodule OpentelemetryPhoenix do
       "phoenix.action": meta.plug_opts
     ]
 
-    span_ctx = Tracer.current_span_ctx()
-    Span.update_name(span_ctx, "#{meta.conn.method} #{meta.route}")
-    Span.set_attributes(span_ctx, attributes)
+    # Add more info that we now know about but don't close the span
+    ctx = OpentelemetryTelemetry.set_current_telemetry_span(@tracer_id, meta)
+    Span.update_name(ctx, "#{meta.conn.method} #{meta.route}")
+    Span.set_attributes(ctx, attributes)
   end
 
   @doc false
   def handle_router_dispatch_exception(
         _event,
         _measurements,
-        %{kind: kind, reason: reason, stacktrace: stacktrace},
+        %{kind: kind, reason: reason, stacktrace: stacktrace} = meta,
         _config
       ) do
-    exception_attrs =
-      Keyword.merge(
-        [
-          type: kind,
-          stacktrace: Exception.format_stacktrace(stacktrace)
-        ],
-        Reason.normalize(reason)
-      )
+    ctx = OpentelemetryTelemetry.set_current_telemetry_span(@tracer_id, meta)
 
-    status = OpenTelemetry.status(:Error, "Error")
-    span_ctx = Tracer.current_span_ctx()
+    {[reason: reason], attrs} =
+      Reason.normalize(reason)
+      |> Keyword.split([:reason])
 
-    Span.add_event(span_ctx, "exception", exception_attrs)
-    Span.set_status(span_ctx, status)
+    # try to normalize all errors to Elixir exceptions
+    exception = Exception.normalize(kind, reason, stacktrace)
+
+    # record exception and mark the span as errored
+    Span.record_exception(ctx, exception, stacktrace, attrs)
+    Span.set_status(ctx, OpenTelemetry.status(:error, "Error"))
+
+    # do not close the span as endpoint stop will still be called with
+    # more info, including the status code, which is nil at this stage
   end
 
   defp http_flavor({_adapter_name, meta}) do
