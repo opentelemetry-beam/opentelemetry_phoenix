@@ -132,8 +132,13 @@ defmodule OpentelemetryPhoenix do
   @doc false
   def handle_endpoint_stop(_event, _measurements, %{conn: conn} = meta, _config) do
     # ensure the correct span is current and update the status
-    OpentelemetryTelemetry.set_current_telemetry_span(@tracer_id, meta)
-    |> Span.set_attribute(:"http.status", conn.status)
+    ctx = OpentelemetryTelemetry.set_current_telemetry_span(@tracer_id, meta)
+
+    Span.set_attribute(ctx, :"http.status", conn.status)
+
+    if conn.status >= 400 do
+      Span.set_status(ctx, OpenTelemetry.status(:error, ""))
+    end
 
     # end the Phoenix span
     OpentelemetryTelemetry.end_telemetry_span(@tracer_id, meta)
@@ -143,12 +148,13 @@ defmodule OpentelemetryPhoenix do
   def handle_router_dispatch_start(_event, _measurements, meta, _config) do
     attributes = [
       "phoenix.plug": meta.plug,
-      "phoenix.action": meta.plug_opts
+      "phoenix.action": meta.plug_opts,
+      "http.route": meta.route
     ]
 
     # Add more info that we now know about but don't close the span
     ctx = OpentelemetryTelemetry.set_current_telemetry_span(@tracer_id, meta)
-    Span.update_name(ctx, "#{meta.conn.method} #{meta.route}")
+    Span.update_name(ctx, "#{meta.route}")
     Span.set_attributes(ctx, attributes)
   end
 
@@ -170,7 +176,7 @@ defmodule OpentelemetryPhoenix do
 
     # record exception and mark the span as errored
     Span.record_exception(ctx, exception, stacktrace, attrs)
-    Span.set_status(ctx, OpenTelemetry.status(:error, "Error"))
+    Span.set_status(ctx, OpenTelemetry.status(:error, ""))
 
     # do not close the span as endpoint stop will still be called with
     # more info, including the status code, which is nil at this stage
