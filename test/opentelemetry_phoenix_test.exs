@@ -53,7 +53,7 @@ defmodule OpentelemetryPhoenixTest do
 
     assert_receive {:span,
                     span(
-                      name: "GET /users/:user_id",
+                      name: "/users/:user_id",
                       attributes: list
                     )}
 
@@ -62,6 +62,7 @@ defmodule OpentelemetryPhoenixTest do
              "http.flavor": :"1.1",
              "http.host": "localhost",
              "http.method": "GET",
+             "http.route": "/users/:user_id",
              "http.scheme": "http",
              "http.status": 200,
              "http.target": "/users/123",
@@ -103,11 +104,11 @@ defmodule OpentelemetryPhoenixTest do
       Meta.endpoint_stop(:exception)
     )
 
-    expected_status = OpenTelemetry.status(:error, "Error")
+    expected_status = OpenTelemetry.status(:error, "")
 
     assert_receive {:span,
                     span(
-                      name: "GET /users/:user_id/exception",
+                      name: "/users/:user_id/exception",
                       attributes: list,
                       kind: :server,
                       events: [
@@ -130,6 +131,7 @@ defmodule OpentelemetryPhoenixTest do
              "http.flavor": :"1.1",
              "http.host": "localhost",
              "http.method": "GET",
+             "http.route": "/users/:user_id/exception",
              "http.scheme": "http",
              "http.status": 500,
              "http.target": "/users/123/exception",
@@ -171,11 +173,11 @@ defmodule OpentelemetryPhoenixTest do
       Meta.endpoint_stop(:exception)
     )
 
-    expected_status = OpenTelemetry.status(:error, "Error")
+    expected_status = OpenTelemetry.status(:error, "")
 
     assert_receive {:span,
                     span(
-                      name: "GET /users/:user_id/exception",
+                      name: "/users/:user_id/exception",
                       attributes: list,
                       kind: :server,
                       events: [
@@ -196,6 +198,7 @@ defmodule OpentelemetryPhoenixTest do
              "http.flavor": :"1.1",
              "http.host": "localhost",
              "http.method": "GET",
+             "http.route": "/users/:user_id/exception",
              "http.scheme": "http",
              "http.status": 500,
              "http.target": "/users/123/exception",
