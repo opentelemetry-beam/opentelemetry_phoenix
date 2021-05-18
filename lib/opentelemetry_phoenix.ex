@@ -43,7 +43,8 @@ defmodule OpentelemetryPhoenix do
   def setup(opts \\ []) do
     opts = ensure_opts(opts)
 
-    OpenTelemetry.register_application_tracer(@tracer_id)
+    {:ok, otel_phx_vsn} = :application.get_key(@tracer_id, :vsn)
+    OpenTelemetry.register_tracer(@tracer_id, otel_phx_vsn)
 
     attach_endpoint_start_handler(opts)
     attach_endpoint_stop_handler(opts)

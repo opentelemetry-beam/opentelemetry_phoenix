@@ -39,6 +39,7 @@ defmodule OpentelemetryPhoenix.MixProject do
   defp package do
     [
       description: "OpenTelemetry tracing for the Phoenix Framework",
+      files: ~w(lib .formatter.exs mix.exs README* LICENSE* CHANGELOG*),
       licenses: ["Apache-2.0"],
       links: %{
         "GitHub" => "https://github.com/opentelemetry-beam/opentelemetry_phoenix",
