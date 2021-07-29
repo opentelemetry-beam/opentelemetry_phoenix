@@ -54,7 +54,8 @@ defmodule OpentelemetryPhoenixTest do
     assert_receive {:span,
                     span(
                       name: "/users/:user_id",
-                      attributes: list
+                      attributes: list,
+                      parent_span_id: 13_235_353_014_750_950_193
                     )}
 
     assert [
@@ -123,6 +124,7 @@ defmodule OpentelemetryPhoenixTest do
                           ]
                         )
                       ],
+                      parent_span_id: 13_235_353_014_750_950_193,
                       status: ^expected_status
                     )}
 
@@ -190,6 +192,7 @@ defmodule OpentelemetryPhoenixTest do
                           ]
                         )
                       ],
+                      parent_span_id: 13_235_353_014_750_950_193,
                       status: ^expected_status
                     )}
 
