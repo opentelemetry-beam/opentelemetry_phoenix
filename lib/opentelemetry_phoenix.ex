@@ -195,21 +195,16 @@ defmodule OpentelemetryPhoenix do
   end
 
   defp client_ip(%{remote_ip: remote_ip} = conn) do
-    case header_value(conn, "x-forwarded-for") |> parse_x_forwarded_for() do
-      {:ok, ip_address} ->
+    case header_value(conn, "x-forwarded-for") do
+      "" ->
+        remote_ip
+        |> :inet_parse.ntoa()
+        |> to_string()
+
+      ip_address ->
         ip_address
-
-      _ ->
-        remote_ip |> :inet_parse.ntoa() |> to_string()
-    end
-  end
-
-  defp parse_x_forwarded_for(x_forwarded_for) when is_binary(x_forwarded_for) do
-    with [ip_addres_str | _proxy_list] <- String.split(x_forwarded_for, ","),
-         {:ok, ip_address} <- ip_addres_str |> String.trim() |> String.to_charlist() |> :inet.parse_address() do
-      {:ok, ip_address |> :inet_parse.ntoa() |> to_string()}
-    else
-      _ -> :error
+        |> String.split(",", parts: 2)
+        |> List.first("")
     end
   end
 
