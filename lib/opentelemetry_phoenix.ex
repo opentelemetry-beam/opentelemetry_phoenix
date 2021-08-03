@@ -31,10 +31,13 @@ defmodule OpentelemetryPhoenix do
   @tracer_id :opentelemetry_phoenix
 
   @typedoc "Setup options"
-  @type opts :: [endpoint_prefix()]
+  @type opts :: [endpoint_prefix() | sampler_for()]
 
   @typedoc "The endpoint prefix in your endpoint. Defaults to `[:phoenix, :endpoint]`"
   @type endpoint_prefix :: {:endpoint_prefix, [atom()]}
+
+  @typedoc "A sampler function, which can be used to use a sample a particular requests."
+  @type sampler_for :: (%{measurements: map(), meta: map()} -> {:sampler, :otel_sampler.t()} | :no_sampler)
 
   @doc """
   Initializes and configures the telemetry handlers.
@@ -46,12 +49,24 @@ defmodule OpentelemetryPhoenix do
     {:ok, otel_phx_vsn} = :application.get_key(@tracer_id, :vsn)
     OpenTelemetry.register_tracer(@tracer_id, otel_phx_vsn)
 
-    attach_endpoint_start_handler(opts)
-    attach_endpoint_stop_handler(opts)
-    attach_router_start_handler()
-    attach_router_dispatch_exception_handler()
+    :ok = attach_endpoint_start_handler(opts)
+    :ok = attach_endpoint_stop_handler(opts)
+    :ok = attach_router_start_handler(opts)
+    :ok = attach_router_dispatch_exception_handler(opts)
 
     :ok
+  end
+
+  if Mix.env() == :test do
+    def detach_all do
+      [
+        {__MODULE__, :endpoint_start},
+        {__MODULE__, :endpoint_stop},
+        {__MODULE__, :router_dispatch_start},
+        {__MODULE__, :router_dispatch_exception}
+      ]
+      |> Enum.each(&:telemetry.detach/1)
+    end
   end
 
   defp ensure_opts(opts), do: Keyword.merge(default_opts(), opts)
@@ -66,7 +81,7 @@ defmodule OpentelemetryPhoenix do
       {__MODULE__, :endpoint_start},
       opts[:endpoint_prefix] ++ [:start],
       &__MODULE__.handle_endpoint_start/4,
-      %{}
+      opts
     )
   end
 
@@ -76,33 +91,32 @@ defmodule OpentelemetryPhoenix do
       {__MODULE__, :endpoint_stop},
       opts[:endpoint_prefix] ++ [:stop],
       &__MODULE__.handle_endpoint_stop/4,
-      %{}
+      opts
     )
   end
 
   @doc false
-  def attach_router_start_handler do
+  def attach_router_start_handler(opts) do
     :telemetry.attach(
       {__MODULE__, :router_dispatch_start},
       [:phoenix, :router_dispatch, :start],
       &__MODULE__.handle_router_dispatch_start/4,
-      %{}
+      opts
     )
   end
 
   @doc false
-  def attach_router_dispatch_exception_handler do
+  def attach_router_dispatch_exception_handler(opts) do
     :telemetry.attach(
       {__MODULE__, :router_dispatch_exception},
       [:phoenix, :router_dispatch, :exception],
       &__MODULE__.handle_router_dispatch_exception/4,
-      %{}
+      opts
     )
   end
 
   @doc false
-  def handle_endpoint_start(_event, _measurements, %{conn: %{adapter: adapter} = conn} = meta, _config) do
-    # TODO: maybe add config for what paths are traced? Via sampler?
+  def handle_endpoint_start(_event, measurements, %{conn: %{adapter: adapter} = conn} = meta, config) do
     :otel_propagator.text_map_extract(conn.req_headers)
 
     peer_data = Plug.Conn.get_peer_data(conn)
@@ -125,8 +139,10 @@ defmodule OpentelemetryPhoenix do
       "net.transport": :"IP.TCP"
     ]
 
+    start_opts = maybe_put_sampler(%{kind: :server}, measurements, meta, config)
+
     # start the span with a default name. Route name isn't known until router dispatch
-    OpentelemetryTelemetry.start_telemetry_span(@tracer_id, "HTTP #{conn.method}", meta, %{kind: :server})
+    OpentelemetryTelemetry.start_telemetry_span(@tracer_id, "HTTP #{conn.method}", meta, start_opts)
     |> Span.set_attributes(attributes)
   end
 
@@ -211,6 +227,25 @@ defmodule OpentelemetryPhoenix do
 
       [value | _] ->
         value
+    end
+  end
+
+  defp maybe_put_sampler(opts, measurements, meta, config) do
+    if sampler_for = Keyword.get(config, :sampler_for) do
+      sampler = sampler_for.(%{measurements: measurements, meta: meta})
+
+      case sampler do
+        {:sampler, sampler} ->
+          Map.put(opts, :sampler, sampler)
+
+        :no_sampler ->
+          opts
+
+        _ ->
+          raise ArgumentError, "expected to get {:sampler, otel_sampler.t()} or :no_sampler but got #{inspect(sampler)}"
+      end
+    else
+      opts
     end
   end
 end
