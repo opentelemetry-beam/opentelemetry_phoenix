@@ -31,13 +31,16 @@ defmodule OpentelemetryPhoenix do
   @tracer_id :opentelemetry_phoenix
 
   @typedoc "Setup options"
-  @type opts :: [endpoint_prefix() | sampler_for()]
+  @type opts :: [endpoint_prefix() | sampler()]
 
   @typedoc "The endpoint prefix in your endpoint. Defaults to `[:phoenix, :endpoint]`"
   @type endpoint_prefix :: {:endpoint_prefix, [atom()]}
 
-  @typedoc "A sampler function, which can be used to use a sample a particular requests."
-  @type sampler_for :: (%{measurements: map(), meta: map()} -> {:sampler, :otel_sampler.t()} | :no_sampler)
+  @typedoc "The sampler or sampler function to use when creating the spans."
+  @type sampler :: {:sampler, :otel_sampler.t() | sampler_fun() | nil}
+
+  @type sampler_fun :: (telemetry_data() -> :otel_sampler.t() | nil)
+  @type telemetry_data :: %{measurements: map(), meta: map()}
 
   @doc """
   Initializes and configures the telemetry handlers.
@@ -139,7 +142,11 @@ defmodule OpentelemetryPhoenix do
       "net.transport": :"IP.TCP"
     ]
 
-    start_opts = maybe_put_sampler(%{kind: :server}, measurements, meta, config)
+    sampler = get_sampler(config[:sampler], %{measurements: measurements, meta: meta})
+
+    start_opts =
+      %{kind: :server}
+      |> maybe_put_sampler(sampler)
 
     # start the span with a default name. Route name isn't known until router dispatch
     OpentelemetryTelemetry.start_telemetry_span(@tracer_id, "HTTP #{conn.method}", meta, start_opts)
@@ -230,22 +237,17 @@ defmodule OpentelemetryPhoenix do
     end
   end
 
-  defp maybe_put_sampler(opts, measurements, meta, config) do
-    if sampler_for = Keyword.get(config, :sampler_for) do
-      sampler = sampler_for.(%{measurements: measurements, meta: meta})
+  defp get_sampler(sampler_fun, telemetry_data) when is_function(sampler_fun) do
+    sampler_fun.(telemetry_data)
+  end
 
-      case sampler do
-        {:sampler, sampler} ->
-          Map.put(opts, :sampler, sampler)
+  defp get_sampler(sampler, _telemetry_data), do: sampler
 
-        :no_sampler ->
-          opts
-
-        _ ->
-          raise ArgumentError, "expected to get {:sampler, otel_sampler.t()} or :no_sampler but got #{inspect(sampler)}"
-      end
-    else
+  defp maybe_put_sampler(opts, sampler) do
+    if sampler == nil do
       opts
+    else
+      Map.put(opts, :sampler, sampler)
     end
   end
 end
