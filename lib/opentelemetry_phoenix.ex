@@ -204,7 +204,7 @@ defmodule OpentelemetryPhoenix do
       ip_address ->
         ip_address
         |> String.split(",", parts: 2)
-        |> List.first("")
+        |> List.first()
     end
   end
 
