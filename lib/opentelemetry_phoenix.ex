@@ -211,6 +211,7 @@ defmodule OpentelemetryPhoenix do
       :"HTTP/1.0" -> :"1.0"
       :"HTTP/1.1" -> :"1.1"
       :"HTTP/2.0" -> :"2.0"
+      :"HTTP/2" -> :"2.0"
       :SPDY -> :SPDY
       :QUIC -> :QUIC
       nil -> ""
@@ -218,12 +219,16 @@ defmodule OpentelemetryPhoenix do
   end
 
   defp client_ip(%{remote_ip: remote_ip} = conn) do
-    case Plug.Conn.get_req_header(conn, "x-forwarded-for") do
-      [] ->
-        to_string(:inet_parse.ntoa(remote_ip))
+    case header_value(conn, "x-forwarded-for") do
+      "" ->
+        remote_ip
+        |> :inet_parse.ntoa()
+        |> to_string()
 
-      [client | _] ->
-        client
+      ip_address ->
+        ip_address
+        |> String.split(",", parts: 2)
+        |> List.first()
     end
   end
 

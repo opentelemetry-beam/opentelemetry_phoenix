@@ -79,6 +79,26 @@ defmodule OpentelemetryPhoenixTest do
            ] == List.keysort(list, 0)
   end
 
+  test "parses x-forwarded-for with single value" do
+    OpentelemetryPhoenix.setup()
+
+    x_forwarded_for_request("203.0.113.195")
+
+    assert_receive {:span, span(attributes: list)}
+
+    assert Keyword.fetch!(list, :"http.client_ip") == "203.0.113.195"
+  end
+
+  test "parses x-forwarded-for with multiple values" do
+    OpentelemetryPhoenix.setup()
+
+    x_forwarded_for_request("203.0.113.195, 70.41.3.18, 150.172.238.178")
+
+    assert_receive {:span, span(attributes: list)}
+
+    assert Keyword.fetch!(list, :"http.client_ip") == "203.0.113.195"
+  end
+
   test "records exceptions for Phoenix web requests" do
     OpentelemetryPhoenix.setup()
 
@@ -295,5 +315,29 @@ defmodule OpentelemetryPhoenixTest do
       end
 
     {decision, [], []}
+  end
+
+  defp x_forwarded_for_request(x_forwarded_for) do
+    meta = Meta.endpoint_start()
+
+    meta = %{
+      meta
+      | conn: %{
+          meta.conn
+          | req_headers: [{"x-forwarded-for", x_forwarded_for} | meta.conn.req_headers]
+        }
+    }
+
+    :telemetry.execute(
+      [:phoenix, :endpoint, :start],
+      %{system_time: System.system_time()},
+      meta
+    )
+
+    :telemetry.execute(
+      [:phoenix, :endpoint, :stop],
+      %{duration: 444},
+      Meta.endpoint_stop()
+    )
   end
 end
