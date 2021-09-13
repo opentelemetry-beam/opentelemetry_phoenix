@@ -1,8 +1,12 @@
-# OpentelemetryPhoenix
+# OpentelemetryPhoenix - **ARCHIVED**
 
 [![EEF Observability WG project](https://img.shields.io/badge/EEF-Observability-black)](https://github.com/erlef/eef-observability-wg)
 [![Hex.pm](https://img.shields.io/hexpm/v/opentelemetry_phoenix)](https://hex.pm/packages/opentelemetry_phoenix)
 ![Build Status](https://github.com/opentelemetry-beam/opentelemetry_phoenix/workflows/Tests/badge.svg)
+
+## This project has moved!
+
+**This project now lives at https://github.com/open-telemetry/opentelemetry-erlang-contrib.**
 
 Telemetry handler that creates Opentelemetry spans from Phoenix events.
 
